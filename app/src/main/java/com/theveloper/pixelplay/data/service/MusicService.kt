@@ -56,6 +56,7 @@ import com.theveloper.pixelplay.data.preferences.EqualizerPreferencesRepository
 import com.theveloper.pixelplay.data.preferences.ThemePreferencesRepository
 import com.theveloper.pixelplay.data.preferences.UserPreferencesRepository
 import com.theveloper.pixelplay.data.repository.MusicRepository
+import com.theveloper.pixelplay.data.service.cast.CastRemotePlaybackState
 import com.theveloper.pixelplay.data.service.player.DualPlayerEngine
 import com.theveloper.pixelplay.data.service.player.TransitionController
 import com.theveloper.pixelplay.ui.glancewidget.ControlWidget4x2
@@ -182,6 +183,7 @@ class MusicService : MediaLibraryService() {
     private var castRemoteClientCallback: RemoteMediaClient.Callback? = null
     private var observedCastSession: CastSession? = null
     private var activeCastStatsOccurrenceId: String? = null
+    private var activeCastPlaybackIntent: Boolean = false
     private var playbackSnapshotPersistJob: Job? = null
     private var playbackSnapshotUnloadWriteJob: Job? = null
     private var isRestoringPlaybackSnapshot = false
@@ -207,6 +209,8 @@ class MusicService : MediaLibraryService() {
         private const val PLAYBACK_SNAPSHOT_DEBOUNCE_MS = 1500L
         private const val FORCED_WIDGET_STATE_DEBOUNCE_MS = 250L
         private const val MEDIA_SESSION_BUTTON_DEBOUNCE_MS = 250L
+        private const val DEFERRED_SERVICE_STARTUP_WORK_DELAY_MS = 1_000L
+        private const val PAUSED_RESTORE_PREPARE_QUEUE_LIMIT = 50
         private val pendingMediaButtonForegroundStarts = AtomicInteger(0)
 
         private const val APP_PACKAGE_PREFIX = "com.theveloper.pixelplay"
@@ -404,7 +408,12 @@ class MusicService : MediaLibraryService() {
         engine.addTransitionFinishedListener(transitionFinishedListener)
 
         controller.initialize()
-        initializeCastWearSync()
+        serviceScope.launch {
+            delay(DEFERRED_SERVICE_STARTUP_WORK_DELAY_MS)
+            if (!isPlaybackUnloadInProgress && mediaSession != null) {
+                initializeCastWearSync()
+            }
+        }
         registerHeadsetReconnectMonitor()
 
         serviceScope.launch {
@@ -1612,6 +1621,7 @@ class MusicService : MediaLibraryService() {
             syncCastListeningStatsFromRemote()
         } ?: run {
             activeCastStatsOccurrenceId = null
+            activeCastPlaybackIntent = false
             listeningStatsTracker.onPlaybackStopped()
         }
         requestWidgetFullUpdate(force = true)
@@ -1944,9 +1954,9 @@ class MusicService : MediaLibraryService() {
                     resolvedIndex,
                     snapshot.currentPositionMs.coerceAtLeast(0L)
                 )
-                // Even paused restores must prepare the timeline so duration/seek state is
-                // available immediately when the UI opens after a cold start.
-                player.prepare()
+                if (shouldRestorePlaying || preparedItems.size <= PAUSED_RESTORE_PREPARE_QUEUE_LIMIT) {
+                    player.prepare()
+                }
                 player.repeatMode = safeRepeatMode
                 player.shuffleModeEnabled = false
                 isManualShuffleEnabled = snapshot.shuffleEnabled
@@ -2061,6 +2071,7 @@ class MusicService : MediaLibraryService() {
         val artist: String,
         val artworkUri: Uri?,
         val isPlaying: Boolean,
+        val isActuallyPlaying: Boolean,
         val currentPositionMs: Long,
         val totalDurationMs: Long,
         val repeatMode: Int,
@@ -2082,7 +2093,7 @@ class MusicService : MediaLibraryService() {
                 songId = songId,
                 positionMs = snapshot.currentPositionMs,
                 durationMs = snapshot.totalDurationMs,
-                isPlaying = snapshot.isPlaying
+                isPlaying = snapshot.isActuallyPlaying
             )
             return
         }
@@ -2091,7 +2102,7 @@ class MusicService : MediaLibraryService() {
             songId = songId,
             positionMs = snapshot.currentPositionMs,
             durationMs = snapshot.totalDurationMs,
-            isPlaying = snapshot.isPlaying
+            isPlaying = snapshot.isActuallyPlaying
         )
     }
 
@@ -2144,6 +2155,11 @@ class MusicService : MediaLibraryService() {
             MediaStatus.REPEAT_MODE_REPEAT_ALL_AND_SHUFFLE -> Player.REPEAT_MODE_ALL
             else -> Player.REPEAT_MODE_OFF
         }
+        val remotePlayback = CastRemotePlaybackState.project(
+            mediaStatus = mediaStatus,
+            previousPlayIntent = activeCastPlaybackIntent
+        )
+        activeCastPlaybackIntent = remotePlayback.playWhenReady
 
         return RemotePlaybackSnapshot(
             occurrenceId = occurrenceId,
@@ -2151,7 +2167,8 @@ class MusicService : MediaLibraryService() {
             title = metadata?.getString(CastMediaMetadata.KEY_TITLE).orEmpty(),
             artist = metadata?.getString(CastMediaMetadata.KEY_ARTIST).orEmpty(),
             artworkUri = imageUri,
-            isPlaying = mediaStatus.playerState == MediaStatus.PLAYER_STATE_PLAYING,
+            isPlaying = remotePlayback.isPlaying,
+            isActuallyPlaying = mediaStatus.playerState == MediaStatus.PLAYER_STATE_PLAYING,
             currentPositionMs = remoteClient.approximateStreamPosition.coerceAtLeast(0L),
             totalDurationMs = effectiveDurationMs,
             repeatMode = mappedRepeatMode,

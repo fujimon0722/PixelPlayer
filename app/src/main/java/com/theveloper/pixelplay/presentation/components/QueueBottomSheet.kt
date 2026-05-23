@@ -839,7 +839,7 @@ fun QueueBottomSheet(
                                         onClick = { onPlaySong(song) },
                                         song = song,
                                         isCurrentSong = index == currentSongDisplayIndex,
-                                        isPlaying = isPlaying,
+                                        isPlaying = isPlaying && isVisible,
                                         isDragging = isDragging,
                                         onRemoveClick = { onRemoveSong(song.id) },
                                         isReorderModeEnabled = false,

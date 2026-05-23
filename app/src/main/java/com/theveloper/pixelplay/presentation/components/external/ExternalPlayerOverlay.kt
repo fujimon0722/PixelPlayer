@@ -256,7 +256,7 @@ fun ExternalPlayerOverlay(
                         Spacer(modifier = Modifier.height(24.dp))
 
                         WavySliderExpressive(
-                            value = sliderPosition,
+                            value = { sliderPosition },
                             enabled = totalDuration > 0,
                             onValueChange = { newValue ->
                                 isUserScrubbing = true

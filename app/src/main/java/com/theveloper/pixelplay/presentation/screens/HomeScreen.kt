@@ -198,7 +198,7 @@ fun HomeScreen(
         )
     }
     // Keep the visible Home snapshot stable and only refresh it once the screen is off-screen.
-    var recentlyPlayedSongs by remember { mutableStateOf(latestRecentlyPlayedSongs) }
+    var recentlyPlayedSongs by rememberSaveable { mutableStateOf(latestRecentlyPlayedSongs) }
     val latestRecentlyPlayedSongsState = rememberUpdatedState(latestRecentlyPlayedSongs)
 
     LaunchedEffect(latestRecentlyPlayedSongs, lifecycleOwner) {

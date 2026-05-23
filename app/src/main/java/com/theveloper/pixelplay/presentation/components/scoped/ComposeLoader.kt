@@ -13,6 +13,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.flow.first
+import androidx.compose.runtime.snapshotFlow
 
 // ------------------------------------------------------------
 // 1) Phase loader: compose a subtree only after a threshold, then keep it alive
@@ -86,12 +88,22 @@ fun rememberSmoothProgress(
         sampleNow()
 
         while (isActive) {
-            if (!latestIsVisible) {
-                delay(200L)
-                continue
-            }
+            val isVisible = latestIsVisible
             val isPlaying = latestIsPlayingProvider()
-            val delayMillis = if (isPlaying) latestSampleWhilePlayingMs else latestSampleWhilePausedMs
+
+            if (!isVisible || !isPlaying) {
+                val initialPos = latestPositionProvider()
+                snapshotFlow {
+                    latestIsVisible && latestIsPlayingProvider() || latestPositionProvider() != initialPos
+                }.first { it }
+
+                sampleNow()
+                if (!latestIsVisible || !latestIsPlayingProvider()) {
+                    continue
+                }
+            }
+
+            val delayMillis = latestSampleWhilePlayingMs
             delay(delayMillis.coerceAtLeast(1L))
             sampleNow()
         }

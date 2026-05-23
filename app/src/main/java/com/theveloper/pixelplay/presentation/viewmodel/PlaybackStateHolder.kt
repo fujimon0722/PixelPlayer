@@ -24,6 +24,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
 import com.theveloper.pixelplay.data.model.Song
+import com.theveloper.pixelplay.data.service.cast.CastRemotePlaybackState
 import com.google.android.gms.cast.MediaStatus
 import timber.log.Timber
 import com.theveloper.pixelplay.utils.QueueUtils
@@ -61,9 +62,11 @@ class PlaybackStateHolder @Inject constructor(
          */
         private const val BULK_REPLACE_THRESHOLD = 80
         private const val SHUFFLE_TOGGLE_COOLDOWN_MS = 400L
+        private const val CAST_SEEK_BLOCKED_TOAST_COOLDOWN_MS = 2500L
     }
 
     private var scope: CoroutineScope? = null
+    private var onCastSeekBlocked: (() -> Unit)? = null
     
     // MediaController
     var mediaController: MediaController? = null
@@ -91,6 +94,7 @@ class PlaybackStateHolder @Inject constructor(
     private var coldStartSnapshotPositionMs: Long? = null
     private var shuffleToggleJob: Job? = null
     private var lastShuffleToggleFinishedAtMs: Long = 0L
+    private var lastCastSeekBlockedToastAtMs: Long = 0L
     private val powerManager: PowerManager by lazy(LazyThreadSafetyMode.NONE) {
         appContext.getSystemService(Context.POWER_SERVICE) as PowerManager
     }
@@ -130,8 +134,12 @@ class PlaybackStateHolder @Inject constructor(
         return false
     }
 
-    fun initialize(coroutineScope: CoroutineScope) {
+    fun initialize(
+        coroutineScope: CoroutineScope,
+        onCastSeekBlocked: (() -> Unit)? = null
+    ) {
         this.scope = coroutineScope
+        this.onCastSeekBlocked = onCastSeekBlocked
         scope?.launch {
             val snapshot = runCatching {
                 userPreferencesRepository.getPlaybackQueueSnapshotOnce()
@@ -177,6 +185,19 @@ class PlaybackStateHolder @Inject constructor(
         if (mediaController === controller) {
             mediaController = mediaControllerStack.lastOrNull()
         }
+    }
+
+    private fun notifyCastSeekBlocked() {
+        val nowMs = SystemClock.elapsedRealtime()
+        if (
+            lastCastSeekBlockedToastAtMs > 0L &&
+            nowMs - lastCastSeekBlockedToastAtMs < CAST_SEEK_BLOCKED_TOAST_COOLDOWN_MS
+        ) {
+            return
+        }
+
+        lastCastSeekBlockedToastAtMs = nowMs
+        onCastSeekBlocked?.invoke()
     }
 
     private fun activeLocalPlayer(): Player {
@@ -358,12 +379,19 @@ class PlaybackStateHolder @Inject constructor(
         val remoteMediaClient = castSession?.remoteMediaClient
 
         if (castSession != null && remoteMediaClient != null) {
-            if (remoteMediaClient.isPlaying) {
+            val remotePlayback = remoteMediaClient.mediaStatus?.let { mediaStatus ->
+                CastRemotePlaybackState.project(
+                    mediaStatus = mediaStatus,
+                    previousPlayIntent = _stablePlayerState.value.playWhenReady
+                )
+            }
+            if (remoteMediaClient.isPlaying || remotePlayback?.playWhenReady == true) {
                 castStateHolder.castPlayer?.pause()
                 _stablePlayerState.update {
                     it.copy(
                         isPlaying = false,
-                        playWhenReady = false
+                        playWhenReady = false,
+                        isBuffering = false
                     )
                 }
             } else {
@@ -396,10 +424,26 @@ class PlaybackStateHolder @Inject constructor(
         val castSession = castStateHolder.castSession.value
         if (castSession != null && castSession.remoteMediaClient != null) {
             val targetPosition = position.coerceAtLeast(0L)
+            val castPlayer = castStateHolder.castPlayer
+            if (castPlayer?.canSeekCurrentItem() == false) {
+                remoteSeekUnlockJob?.cancel()
+                castStateHolder.setRemotelySeeking(false)
+                castSession.remoteMediaClient?.requestStatus()
+                notifyCastSeekBlocked()
+                Timber.tag(TAG).w("Ignoring Cast seek for current item because receiver-side Ogg seeking is unstable.")
+                return
+            }
             castStateHolder.setRemotelySeeking(true)
             castStateHolder.setRemotePosition(targetPosition)
             setCurrentPosition(targetPosition)
-            castStateHolder.castPlayer?.seek(targetPosition)
+            if (castPlayer?.seek(targetPosition) != true) {
+                castStateHolder.setRemotelySeeking(false)
+                castSession.remoteMediaClient?.requestStatus()
+                if (castPlayer != null) {
+                    notifyCastSeekBlocked()
+                }
+                return
+            }
 
             remoteSeekUnlockJob?.cancel()
             remoteSeekUnlockJob = scope?.launch {
@@ -567,43 +611,52 @@ class PlaybackStateHolder @Inject constructor(
             while (true) {
                 val tickMs = currentProgressTickMs()
                 val castSession = castStateHolder.castSession.value
-                val isRemote = castSession?.remoteMediaClient != null
+                val remoteClient = castSession?.remoteMediaClient
+                val isRemote = remoteClient != null
                 
                 if (isRemote) {
-                    val remoteClient = castSession?.remoteMediaClient
-                    if (remoteClient != null) {
-                        val isRemotePlaying = remoteClient.isPlaying
-                        val currentPosition = remoteClient.approximateStreamPosition.coerceAtLeast(0L)
-                        val songDurationHint = _stablePlayerState.value.currentSong?.duration ?: 0L
-                        val duration = resolveEffectiveDuration(
-                            reportedDurationMs = remoteClient.streamDuration,
-                            songDurationHintMs = songDurationHint,
-                            currentPositionMs = currentPosition
+                    val activeRemoteClient = checkNotNull(remoteClient)
+                    val previousPlayIntent = _stablePlayerState.value.playWhenReady
+                    val remotePlayback = activeRemoteClient.mediaStatus?.let { mediaStatus ->
+                        CastRemotePlaybackState.project(
+                            mediaStatus = mediaStatus,
+                            previousPlayIntent = previousPlayIntent
                         )
-                        val isRemotelySeeking = castStateHolder.isRemotelySeeking.value
-                        if (!isRemotelySeeking) {
-                            castStateHolder.setRemotePosition(currentPosition)
-                        }
+                    }
+                    val isRemotePlaying = remotePlayback?.isPlaying ?: activeRemoteClient.isPlaying
+                    val remotePlayWhenReady = remotePlayback?.playWhenReady ?: activeRemoteClient.isPlaying
+                    val currentPosition = activeRemoteClient.approximateStreamPosition.coerceAtLeast(0L)
+                    val songDurationHint = _stablePlayerState.value.currentSong?.duration ?: 0L
+                    val duration = resolveEffectiveDuration(
+                        reportedDurationMs = activeRemoteClient.streamDuration,
+                        songDurationHintMs = songDurationHint,
+                        currentPositionMs = currentPosition
+                    )
+                    val isRemotelySeeking = castStateHolder.isRemotelySeeking.value
+                    if (!isRemotelySeeking) {
+                        castStateHolder.setRemotePosition(currentPosition)
+                    }
 
-                        val nextPosition = if (isRemotelySeeking) _currentPosition.value else currentPosition
-                        if (_currentPosition.value != nextPosition) {
-                            _currentPosition.value = nextPosition
-                        }
+                    val nextPosition = if (isRemotelySeeking) _currentPosition.value else currentPosition
+                    if (_currentPosition.value != nextPosition) {
+                        _currentPosition.value = nextPosition
+                    }
 
-                        _stablePlayerState.update { state ->
-                            if (
-                                state.totalDuration == duration &&
-                                state.isPlaying == isRemotePlaying &&
-                                state.playWhenReady == isRemotePlaying
-                            ) {
-                                state
-                            } else {
-                                state.copy(
-                                    totalDuration = duration,
-                                    isPlaying = isRemotePlaying,
-                                    playWhenReady = isRemotePlaying
-                                )
-                            }
+                    _stablePlayerState.update { state ->
+                        if (
+                            state.totalDuration == duration &&
+                            state.isPlaying == isRemotePlaying &&
+                            state.playWhenReady == remotePlayWhenReady &&
+                            state.isBuffering == (remotePlayback?.isBuffering ?: false)
+                        ) {
+                            state
+                        } else {
+                            state.copy(
+                                totalDuration = duration,
+                                isPlaying = isRemotePlaying,
+                                playWhenReady = remotePlayWhenReady,
+                                isBuffering = remotePlayback?.isBuffering ?: false
+                            )
                         }
                     }
                 } else {
