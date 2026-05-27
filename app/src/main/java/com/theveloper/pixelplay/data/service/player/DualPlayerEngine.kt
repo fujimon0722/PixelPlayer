@@ -513,12 +513,19 @@ class DualPlayerEngine @Inject constructor(
     private fun shouldDisableAudioOffloadByDefault(): Boolean {
         val manufacturer = Build.MANUFACTURER.lowercase()
         val brand = Build.BRAND.lowercase()
+        // Xiaomi-family devices on SDK 36+ still need the static disable: their
+        // HAL offload path has its own quirks that the runtime fallback below
+        // hasn't been validated against.
         val isXiaomiFamilyDevice = manufacturer == "xiaomi" || brand == "xiaomi" || brand == "redmi" || brand == "poco"
         if (isXiaomiFamilyDevice && Build.VERSION.SDK_INT >= 36) return true
 
-        val isGooglePixel = manufacturer == "google" && brand == "google"
-        if (isGooglePixel && Build.VERSION.SDK_INT >= 34) return true
-
+        // Pixel blacklist (previously: SDK >= 34) removed. The original "playback
+        // does not start with offload" symptom is now caught by
+        // scheduleAudioOffloadFallbackIfNeeded() + disableAudioOffloadForSession(),
+        // which rebuild the player to PCM if the HAL stays in STATE_BUFFERING
+        // for more than AUDIO_OFFLOAD_BUFFERING_FALLBACK_MS. Leaving offload on
+        // by default reclaims the 30–50% battery savings the DSP path provides
+        // for the common case where the HAL works correctly.
         return false
     }
 

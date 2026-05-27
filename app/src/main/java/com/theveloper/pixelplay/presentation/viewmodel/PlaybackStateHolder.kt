@@ -15,10 +15,13 @@ import javax.inject.Singleton
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -608,13 +611,21 @@ class PlaybackStateHolder @Inject constructor(
     fun startProgressUpdates() {
         stopProgressUpdates()
         progressJob = scope?.launch {
-            while (true) {
-                val tickMs = currentProgressTickMs()
-                val castSession = castStateHolder.castSession.value
-                val remoteClient = castSession?.remoteMediaClient
-                val isRemote = remoteClient != null
-                
-                if (isRemote) {
+            // Battery: only spin the polling loop while something is actually
+            // observing currentPosition. With no subscribers (screen off and
+            // no lock-screen progress UI mounted), this collectLatest sits
+            // idle and the CPU stays asleep. As soon as a subscriber appears
+            // (player sheet opened, widget bound, etc.) the inner loop resumes.
+            _currentPosition.subscriptionCount.collectLatest { subscriberCount ->
+                if (subscriberCount == 0) return@collectLatest
+                coroutineScope {
+                    while (isActive) {
+                        val tickMs = currentProgressTickMs()
+                        val castSession = castStateHolder.castSession.value
+                        val remoteClient = castSession?.remoteMediaClient
+                        val isRemote = remoteClient != null
+
+                        if (isRemote) {
                     val activeRemoteClient = checkNotNull(remoteClient)
                     val previousPlayIntent = _stablePlayerState.value.playWhenReady
                     val remotePlayback = activeRemoteClient.mediaStatus?.let { mediaStatus ->
@@ -700,7 +711,9 @@ class PlaybackStateHolder @Inject constructor(
                          }
                       }
                 }
-                delay(tickMs)
+                        delay(tickMs)
+                    }
+                }
             }
         }
     }
