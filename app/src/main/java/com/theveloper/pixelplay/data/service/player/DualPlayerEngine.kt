@@ -862,8 +862,18 @@ class DualPlayerEngine @Inject constructor(
         val extractorsFactory = DefaultExtractorsFactory()
             .setMp4ExtractorFlags(Mp4Extractor.FLAG_WORKAROUND_IGNORE_EDIT_LISTS)
 
+        // Time-based buffering normalizes start/load behaviour across formats. With
+        // prioritizeTimeOverSizeThresholds=true the loader keys off buffered *duration*
+        // instead of buffered *bytes*, so a 24/96 FLAC (~5-9 Mbps) and a 128 kbps MP3
+        // reach READY after the same seconds buffered rather than the same megabytes —
+        // removing the "some files take longer to start" gap that scaled with bitrate.
+        // bufferForPlayback is lowered from 5s to 2s so high-bitrate/lossless tracks
+        // (which read/decode more data per second) start about as fast as compressed ones,
+        // while bufferForPlaybackAfterRebuffer stays at 5s to keep recovery safe on slow
+        // storage and remote streams.
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(30_000, 60_000, 5_000, 5_000)
+            .setBufferDurationsMs(30_000, 60_000, 2_000, 5_000)
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
         return ExoPlayer.Builder(context, renderersFactory)
