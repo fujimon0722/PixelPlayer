@@ -93,13 +93,6 @@ fun ExternalPlayerOverlay(
         )
     }
 
-    val controlAnimationSpec = remember {
-        spring<Float>(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMedium
-        )
-    }
-
     LaunchedEffect(currentSong) {
         if (currentSong != null) {
             awaitingSong = false
@@ -306,7 +299,6 @@ fun ExternalPlayerOverlay(
                             onPlayPause = playerViewModel::playPause,
                             onNext = playerViewModel::nextSong,
                             height = 76.dp,
-                            pressAnimationSpec = controlAnimationSpec,
                             colorOtherButtons = skipContainer,
                             colorPlayPause = playPauseContainer,
                             tintPlayPauseIcon = playPauseContent,

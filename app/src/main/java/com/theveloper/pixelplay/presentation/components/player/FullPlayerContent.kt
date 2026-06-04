@@ -1123,9 +1123,6 @@ private fun FullPlayerControlsSection(
     onRepeatToggle: () -> Unit,
     onFavoriteToggle: () -> Unit
 ) {
-    val stableControlAnimationSpec = remember {
-        tween<Float>(durationMillis = 240, easing = FastOutSlowInEasing)
-    }
     val shouldDelay = loadingTweaks.delayAll || loadingTweaks.delayControls
 
     DelayedContent(
@@ -1159,7 +1156,6 @@ private fun FullPlayerControlsSection(
                 onPlayPause = onPlayPause,
                 onNext = onNext,
                 height = 80.dp,
-                pressAnimationSpec = stableControlAnimationSpec,
                 releaseDelay = 220L,
                 colorOtherButtons = transportSkipColors.container,
                 colorPlayPause = transportPlayPauseColors.container,
