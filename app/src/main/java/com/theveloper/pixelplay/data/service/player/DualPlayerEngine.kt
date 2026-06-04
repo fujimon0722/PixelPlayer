@@ -1,5 +1,6 @@
 package com.theveloper.pixelplay.data.service.player
 
+import android.app.ActivityManager
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -153,6 +154,41 @@ internal fun shouldDisableAudioOffloadOnEarlyBuffering(
         timeSincePlayingMs < 500L &&
         !isPostSeekBuffering &&
         !isPostTransitionBuffering
+}
+
+/** ExoPlayer [DefaultLoadControl] buffer durations (ms) for a build of the player. */
+internal data class LoadControlBufferProfile(
+    val minBufferMs: Int,
+    val maxBufferMs: Int,
+    val bufferForPlaybackMs: Int,
+    val bufferForPlaybackAfterRebufferMs: Int
+)
+
+/**
+ * Picks the buffer profile for the player. On memory-constrained devices the maximum
+ * prefetch depth is reduced to cap peak RAM — with time-based buffering the buffered RAM is
+ * bitrate × seconds, so a 60 s window on a hi-res lossless track (plus a second buffered
+ * player during a crossfade) can be tens of MB. Shrinking the *time* window (not switching
+ * to a byte threshold) keeps start latency and cross-format uniformity identical to the
+ * normal profile; only how far ahead we prefetch changes, which is free for local files and
+ * still ample for remote streams. Normal-RAM devices are unchanged.
+ */
+internal fun loadControlBufferProfileFor(isLowRamDevice: Boolean): LoadControlBufferProfile {
+    return if (isLowRamDevice) {
+        LoadControlBufferProfile(
+            minBufferMs = 15_000,
+            maxBufferMs = 30_000,
+            bufferForPlaybackMs = 2_000,
+            bufferForPlaybackAfterRebufferMs = 5_000
+        )
+    } else {
+        LoadControlBufferProfile(
+            minBufferMs = 30_000,
+            maxBufferMs = 60_000,
+            bufferForPlaybackMs = 2_000,
+            bufferForPlaybackAfterRebufferMs = 5_000
+        )
+    }
 }
 
 /**
@@ -616,6 +652,13 @@ class DualPlayerEngine @Inject constructor(
     private var isReleased = false
     private val resolvedUriCache = LruCache<String, Uri>(100)
 
+    // Whether the OS classifies this as a low-RAM device. Used to cap the player's max
+    // prefetch depth so hi-res/lossless buffering (and the second player during a crossfade)
+    // can't balloon peak memory on constrained hardware. Cached: it never changes at runtime.
+    private val isLowRamDevice: Boolean by lazy {
+        (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true
+    }
+
     fun initialize() {
         if (!isReleased && ::playerA.isInitialized && playerA.applicationLooper.thread.isAlive) return
         if (scope.coroutineContext[Job]?.isActive != true) {
@@ -914,9 +957,16 @@ class DualPlayerEngine @Inject constructor(
         // bufferForPlayback is lowered from 5s to 2s so high-bitrate/lossless tracks
         // (which read/decode more data per second) start about as fast as compressed ones,
         // while bufferForPlaybackAfterRebuffer stays at 5s to keep recovery safe on slow
-        // storage and remote streams.
+        // storage and remote streams. On low-RAM devices the max prefetch window is reduced
+        // (see loadControlBufferProfileFor) to cap peak memory without changing start latency.
+        val bufferProfile = loadControlBufferProfileFor(isLowRamDevice)
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(30_000, 60_000, 2_000, 5_000)
+            .setBufferDurationsMs(
+                bufferProfile.minBufferMs,
+                bufferProfile.maxBufferMs,
+                bufferProfile.bufferForPlaybackMs,
+                bufferProfile.bufferForPlaybackAfterRebufferMs
+            )
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
