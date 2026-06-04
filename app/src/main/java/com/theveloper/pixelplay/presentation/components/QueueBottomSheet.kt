@@ -246,6 +246,8 @@ fun QueueBottomSheet(
     onQueueDragStart: () -> Unit,
     onQueueDrag: (Float) -> Unit,
     onQueueRelease: (Float, Float) -> Unit,
+    predictiveBackProgress: Animatable<Float, androidx.compose.animation.core.AnimationVector1D>,
+    predictiveBackSwipeEdge: androidx.compose.runtime.State<Int?>,
     modifier: Modifier = Modifier,
     tonalElevation: Dp = 10.dp,
     shape: RoundedCornerShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
@@ -707,7 +709,26 @@ fun QueueBottomSheet(
         }
 
     Surface(
-        modifier = modifier,
+        modifier = modifier
+            .graphicsLayer {
+                val p = predictiveBackProgress.value
+                if (p > 0f) {
+                    val scale = 1f - (p * 0.1f)
+                    scaleX = scale
+                    scaleY = scale
+                    translationY = p * 80.dp.toPx()
+                    
+                    val swipeEdge = predictiveBackSwipeEdge.value
+                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(
+                        pivotFractionX = 0.5f,
+                        pivotFractionY = 1.0f
+                    )
+                    
+                    val cornerRadius = androidx.compose.ui.unit.lerp(28.dp, 48.dp, p)
+                    clip = true
+                    this.shape = RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius)
+                }
+            },
         shape = shape,
         tonalElevation = tonalElevation,
         color = colors.surfaceContainer,
