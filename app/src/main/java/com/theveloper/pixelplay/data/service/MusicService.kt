@@ -2009,6 +2009,7 @@ class MusicService : MediaLibraryService() {
         val wearThemePalette = schemePair?.let { buildWearThemePalette(it.dark) }
 
         val isFavorite = isSongFavorite(mediaId)
+        val lyrics = resolveWearLyrics(mediaId)
         val wearQueueRevision = buildWearQueueRevision(
             timeline = snapshotTimeline,
             currentIndex = snapshotWindowIndex,
@@ -2058,6 +2059,7 @@ class MusicService : MediaLibraryService() {
             currentPositionMs = currentPosition,
             totalDurationMs = totalDuration,
             isFavorite = isFavorite,
+            lyrics = lyrics,
             queue = queueItems,
             themeColors = widgetColors,
             isShuffleEnabled = shuffleEnabled,
@@ -2065,6 +2067,19 @@ class MusicService : MediaLibraryService() {
             wearThemePalette = wearThemePalette,
             wearQueueRevision = wearQueueRevision,
         )
+    }
+
+    private suspend fun resolveWearLyrics(mediaId: String?): com.theveloper.pixelplay.data.model.Lyrics? {
+        val songId = mediaId?.takeIf { it.isNotBlank() } ?: return null
+        return runCatching {
+            withContext(Dispatchers.IO) {
+                val song = musicRepository.getSong(songId).first() ?: return@withContext null
+                musicRepository.getStoredLyrics(song)?.first
+            }
+        }.getOrElse { error ->
+            Timber.tag(TAG).d(error, "Unable to resolve Wear lyrics for mediaId=%s", songId)
+            null
+        }
     }
 
     // Color scheme cache: skip recomputation when art URI, palette style, and accuracy haven't changed

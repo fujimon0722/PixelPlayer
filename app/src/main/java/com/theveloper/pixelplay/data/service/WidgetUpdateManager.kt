@@ -133,7 +133,10 @@ internal class WidgetUpdateManager(
     }
 
     private fun shouldPublishWearState(old: PlayerInfo, new: PlayerInfo): Boolean {
-        return shouldUpdateWidget(old, new) || old.wearQueueRevision != new.wearQueueRevision
+        return shouldUpdateWidget(old, new) ||
+            old.wearQueueRevision != new.wearQueueRevision ||
+            old.lyrics != new.lyrics ||
+            old.isLoadingLyrics != new.isLoadingLyrics
     }
 
     private suspend fun updateGlanceWidgets(playerInfo: PlayerInfo) = withContext(Dispatchers.IO) {
