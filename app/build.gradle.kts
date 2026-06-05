@@ -97,7 +97,12 @@ android {
         }
 
         release {
-            signingConfig = signingConfigs.getByName("release")
+            val keystoreFile = file("$rootDir/vz-pixelplay.jks")
+            signingConfig = if (keystoreFile.exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
