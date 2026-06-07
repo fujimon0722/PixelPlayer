@@ -64,6 +64,7 @@ class MusicRepositoryImplTest {
         )
         every { mockMusicDao.getAllArtistsRaw() } returns flowOf(dummyArtists)
         coEvery { mockMusicDao.getDistinctParentDirectories() } returns listOf("/music/folder1", "/music/folder2")
+        every { mockMusicDao.getDistinctParentDirectoriesFlow() } returns flowOf(listOf("/music/folder1", "/music/folder2"))
         every { mockTelegramCacheManagerProvider.get() } returns mockTelegramCacheManager
         every { mockTelegramRepositoryProvider.get() } returns mockTelegramRepository
 
