@@ -393,6 +393,15 @@ interface MusicDao {
     @Query("SELECT DISTINCT parent_directory_path FROM songs")
     suspend fun getDistinctParentDirectories(): List<String>
 
+    /**
+     * Reactive variant of [getDistinctParentDirectories]. Re-emits whenever the songs
+     * table changes (e.g. after a sync adds songs in new folders), so cached directory
+     * filters stay consistent with the actual library instead of freezing at an early,
+     * possibly-empty snapshot taken before the first sync completes.
+     */
+    @Query("SELECT DISTINCT parent_directory_path FROM songs")
+    fun getDistinctParentDirectoriesFlow(): Flow<List<String>>
+
     // --- Song Queries ---
     // Updated getSongs to include Telegram songs (negative IDs) regardless of directory filter
     @Query("SELECT " + SONG_LIST_PROJECTION + """
@@ -658,7 +667,7 @@ interface MusicDao {
 
     @Query("""
         SELECT id FROM songs
-        WHERE (:applyDirectoryFilter = 0 OR parent_directory_path IN (:allowedParentDirs))
+        WHERE (:applyDirectoryFilter = 0 OR id < 0 OR parent_directory_path IN (:allowedParentDirs))
         AND (
             :filterMode = 0
             OR (
@@ -695,7 +704,7 @@ interface MusicDao {
     @Query("""
         SELECT songs.id FROM songs
         INNER JOIN favorites ON songs.id = favorites.songId AND favorites.isFavorite = 1
-        WHERE (:applyDirectoryFilter = 0 OR songs.parent_directory_path IN (:allowedParentDirs))
+        WHERE (:applyDirectoryFilter = 0 OR songs.id < 0 OR songs.parent_directory_path IN (:allowedParentDirs))
         AND (
             :filterMode = 0
             OR (

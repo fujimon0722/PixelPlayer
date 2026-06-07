@@ -129,21 +129,40 @@ class MusicRepositoryImpl @Inject constructor(
     private fun normalizePath(path: String): String =
         runCatching { File(path).canonicalPath }.getOrElse { File(path).absolutePath }
 
-    /** Cached directory filter — recomputed only when allowed/blocked dirs preferences change. */
+    /** Cached directory filter — recomputed when allowed/blocked dirs preferences change or when the set of song folders changes. */
     data class CachedDirFilter(val allowedParentDirs: List<String> = emptyList(), val applyFilter: Boolean = false)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val cachedDirFilter: StateFlow<CachedDirFilter> = combine(
         userPreferencesRepository.allowedDirectoriesFlow,
         userPreferencesRepository.blockedDirectoriesFlow
-    ) { allowed, blocked ->
-        val (dirs, apply) = DirectoryFilterUtils.computeAllowedParentDirs(
-            allowedDirs = allowed,
-            blockedDirs = blocked,
-            getAllParentDirs = { musicDao.getDistinctParentDirectories() },
-            normalizePath = ::normalizePath
-        )
-        CachedDirFilter(dirs, apply)
-    }.stateIn(repositoryScope, SharingStarted.Eagerly, CachedDirFilter())
+    ) { allowed, blocked -> allowed to blocked }
+        .flatMapLatest { (allowed, blocked) ->
+            if (blocked.isEmpty()) {
+                // No blocked dirs => no directory filter is applied. Avoid observing the
+                // songs table at all in this (common) case.
+                flowOf(CachedDirFilter(emptyList(), false))
+            } else {
+                // Recompute whenever the set of song folders changes (e.g. after a sync),
+                // so the filter never freezes at a stale/empty snapshot. Previously this
+                // was computed once, eagerly at construction — before the first sync — which
+                // on some devices left allowedParentDirs empty while applyFilter stayed true,
+                // making queue-building queries (getSongIdsSorted) return nothing and collapse
+                // the playback queue to just the tapped song.
+                musicDao.getDistinctParentDirectoriesFlow()
+                    .distinctUntilChanged()
+                    .map { parentDirs ->
+                        val (dirs, apply) = DirectoryFilterUtils.computeAllowedParentDirs(
+                            allowedDirs = allowed,
+                            blockedDirs = blocked,
+                            getAllParentDirs = { parentDirs },
+                            normalizePath = ::normalizePath
+                        )
+                        CachedDirFilter(dirs, apply)
+                    }
+            }
+        }
+        .stateIn(repositoryScope, SharingStarted.Eagerly, CachedDirFilter())
 
     private fun ensureTelegramDownloadSyncObserverStarted() {
         if (telegramDownloadSyncObserverStarted) return
