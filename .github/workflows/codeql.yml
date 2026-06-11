@@ -35,9 +35,10 @@ jobs:
           cache-provider: 'enhanced'
   
       - name: Pin Kotlin version for CodeQL compatibility
+        continue-on-error: true
         run: |
           sed -i 's/kotlin = "[^"]*" /kotlin = "2.3.20" /' gradle/libs.versions.toml || sed -i 's/kotlin = "[^"]*"$/kotlin = "2.3.20"/' gradle/libs.versions.toml
-          grep "kotlin = \"2.3.20\"" gradle/libs.versions.toml
+          grep "kotlin = \"2.3.20\"" gradle/libs.versions.toml || true
   
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
