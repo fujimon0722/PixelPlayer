@@ -1,9 +1,14 @@
 package com.theveloper.pixelplay.presentation.components
 
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateDp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -39,6 +44,7 @@ fun ScreenWrapper(
     navController: androidx.navigation.NavController,
     playerViewModel: PlayerViewModel,
     modifier: Modifier = Modifier,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null,
     content: @Composable () -> Unit
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -95,28 +101,78 @@ fun ScreenWrapper(
     val previousEntryId = navController.previousBackStackEntry?.id.also { _ -> currentBackStackEntryState }
     val shouldDim = myEntry != null && previousEntryId == myEntry.id
 
+    val disableBlurAllOver by playerViewModel.disableBlurAllOver.collectAsState()
+
+    val transition = animatedVisibilityScope?.transition
+
     // Declarative Animations
-    // Always start animatables at 0f on initial composition.
-    // This ensures they animate to their targets, triggering modifier value updates after the layout pass is complete,
-    // which guarantees that Android's RenderEffect/GraphicsLayer rendering engine initializes and draws correctly.
     val targetRadius = if (shouldRunDepthEffects && !isResumed) 32f else 0f
-    val cornerRadius = remember { Animatable(0f) }
-    LaunchedEffect(targetRadius) {
-        cornerRadius.animateTo(targetRadius, animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing))
+    val animatedCornerRadius = if (transition != null) {
+        val animatedValue by transition.animateFloat(
+            transitionSpec = { tween(durationMillis = 350, easing = FastOutSlowInEasing) },
+            label = "cornerRadius"
+        ) { state ->
+            if (shouldRunDepthEffects && (state == EnterExitState.PostExit || state == EnterExitState.PreEnter)) {
+                32f
+            } else {
+                0f
+            }
+        }
+        animatedValue
+    } else {
+        val fallbackCornerRadius = remember { Animatable(targetRadius) }
+        LaunchedEffect(targetRadius) {
+            fallbackCornerRadius.animateTo(targetRadius, animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing))
+        }
+        fallbackCornerRadius.value
     }
 
-    // Dim: If strictly behind Top -> 0.4f. Else -> 0f.
-    val targetDim = if (shouldRunDepthEffects && shouldDim) 0.4f else 0f
-    val dimAlpha = remember { Animatable(0f) }
-    LaunchedEffect(targetDim) {
-        dimAlpha.animateTo(targetDim, animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing))
+    // Dim: If strictly behind Top -> 0.4f (or 0.75f if blur is disabled). Else -> 0f.
+    val targetDim = if (shouldRunDepthEffects && shouldDim) {
+        if (disableBlurAllOver) 0.75f else 0.4f
+    } else {
+        0f
+    }
+    val animatedDimAlpha = if (transition != null) {
+        val animatedValue by transition.animateFloat(
+            transitionSpec = { tween(durationMillis = 350, easing = CubicBezierEasing(0.5f, 0f, 0.8f, 0.2f)) },
+            label = "dimAlpha"
+        ) { state ->
+            if (shouldRunDepthEffects && shouldDim && (state == EnterExitState.PostExit || state == EnterExitState.PreEnter)) {
+                if (disableBlurAllOver) 0.75f else 0.4f
+            } else {
+                0f
+            }
+        }
+        animatedValue
+    } else {
+        val fallbackDimAlpha = remember { Animatable(targetDim) }
+        LaunchedEffect(targetDim) {
+            fallbackDimAlpha.animateTo(targetDim, animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing))
+        }
+        fallbackDimAlpha.value
     }
 
-    // Blur: If strictly behind Top -> 12dp. Else -> 0dp.
-    val targetBlur = if (shouldRunDepthEffects && shouldDim) 12f else 0f
-    val blurRadius = remember { Animatable(0f) }
-    LaunchedEffect(targetBlur) {
-        blurRadius.animateTo(targetBlur, animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing))
+    // Blur: If strictly behind Top -> 24dp. Else -> 0dp. Disabled if disableBlurAllOver is true.
+    val targetBlur = if (shouldRunDepthEffects && shouldDim && !disableBlurAllOver) 24f else 0f
+    val animatedBlurRadius = if (transition != null) {
+        val animatedValue by transition.animateDp(
+            transitionSpec = { tween(durationMillis = 350, easing = CubicBezierEasing(0.5f, 0f, 0.8f, 0.2f)) },
+            label = "blurRadius"
+        ) { state ->
+            if (shouldRunDepthEffects && shouldDim && !disableBlurAllOver && (state == EnterExitState.PostExit || state == EnterExitState.PreEnter)) {
+                24.dp
+            } else {
+                0.dp
+            }
+        }
+        animatedValue
+    } else {
+        val fallbackBlurRadius = remember { Animatable(targetBlur) }
+        LaunchedEffect(targetBlur) {
+            fallbackBlurRadius.animateTo(targetBlur, animationSpec = tween(durationMillis = 350, easing = FastOutSlowInEasing))
+        }
+        fallbackBlurRadius.value.dp
     }
 
     Box(
@@ -135,14 +191,14 @@ fun ScreenWrapper(
                 } else {
                     CompositingStrategy.Auto
                 }
-                if (shouldRunDepthEffects && cornerRadius.value > 0.5f) {
-                    this.shape = RoundedCornerShape(cornerRadius.value.dp)
+                if (shouldRunDepthEffects && animatedCornerRadius > 0.5f) {
+                    this.shape = RoundedCornerShape(animatedCornerRadius.dp)
                     this.clip = true
                 } else {
                     this.clip = false
                 }
             }
-            .blur(radius = if (shouldRunDepthEffects) blurRadius.value.dp else 0.dp)
+            .blur(radius = if (shouldRunDepthEffects) animatedBlurRadius else 0.dp)
             .background(MaterialTheme.colorScheme.background)
     ) {
         content()
@@ -151,7 +207,7 @@ fun ScreenWrapper(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = dimAlpha.value }
+                .graphicsLayer { alpha = animatedDimAlpha }
                 .background(Color.Black)
         )
     }

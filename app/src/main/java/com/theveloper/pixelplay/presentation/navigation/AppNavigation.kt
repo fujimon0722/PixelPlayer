@@ -120,7 +120,7 @@ fun AppNavigation(
                     )
                 },
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     HomeScreen(
                         navController = navController, 
                         paddingValuesParent = paddingValues, 
@@ -160,7 +160,7 @@ fun AppNavigation(
                     )
                 },
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     SearchScreen(
                         paddingValues = paddingValues,
                         playerViewModel = playerViewModel,
@@ -200,14 +200,14 @@ fun AppNavigation(
                     )
                 },
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     LibraryScreen(navController = navController, playerViewModel = playerViewModel)
                 }
             }
             composable(
                 Screen.Settings.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     SettingsScreen(
                         navController = navController,
                         playerViewModel = playerViewModel,
@@ -220,7 +220,7 @@ fun AppNavigation(
             composable(
                 Screen.Accounts.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     AccountsScreen(
                         onBackClick = { navController.popBackStack() },
                         onOpenNeteaseDashboard = {
@@ -242,7 +242,7 @@ fun AppNavigation(
                 route = Screen.SettingsCategory.route,
                 arguments = listOf(navArgument("categoryId") { type = NavType.StringType }),
             ) { backStackEntry ->
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     val categoryId = backStackEntry.arguments?.getString("categoryId")
                     if (categoryId != null) {
                         SettingsCategoryScreen(
@@ -257,7 +257,7 @@ fun AppNavigation(
             composable(
                 Screen.PaletteStyle.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     PaletteStyleSettingsScreen(
                         playerViewModel = playerViewModel,
                         onBackClick = { navController.popBackStack() }
@@ -267,7 +267,7 @@ fun AppNavigation(
             composable(
                 Screen.Experimental.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     ExperimentalSettingsScreen(
                         navController = navController,
                         playerViewModel = playerViewModel,
@@ -278,7 +278,7 @@ fun AppNavigation(
             composable(
                 Screen.DailyMixScreen.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     DailyMixScreen(
                         playerViewModel = playerViewModel,
                         navController = navController
@@ -288,7 +288,7 @@ fun AppNavigation(
             composable(
                 Screen.RecentlyPlayed.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     RecentlyPlayedScreen(
                         playerViewModel = playerViewModel,
                         navController = navController
@@ -298,7 +298,7 @@ fun AppNavigation(
             composable(
                 Screen.Stats.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     StatsScreen(
                         navController = navController
                     )
@@ -311,7 +311,7 @@ fun AppNavigation(
                 val playlistId = backStackEntry.arguments?.getString("playlistId")
                 val playlistViewModel: PlaylistViewModel = hiltViewModel()
                 if (playlistId != null) {
-                    ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                    ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                         PlaylistDetailScreen(
                             playlistId = playlistId,
                             playerViewModel = playerViewModel,
@@ -327,7 +327,7 @@ fun AppNavigation(
             composable(
                 Screen.DJSpace.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     MashupScreen()
                 }
             }
@@ -337,7 +337,7 @@ fun AppNavigation(
             ) { backStackEntry ->
                 val genreId = backStackEntry.arguments?.getString("genreId")
                 if (genreId != null) {
-                    ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                    ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                         GenreDetailScreen(
                             navController = navController,
                             genreId = genreId,
@@ -354,7 +354,7 @@ fun AppNavigation(
             ) { backStackEntry ->
                 val albumId = backStackEntry.arguments?.getString("albumId")
                 if (albumId != null) {
-                    ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                    ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                         AlbumDetailScreen(
                             albumId = albumId,
                             navController = navController,
@@ -369,7 +369,7 @@ fun AppNavigation(
             ) { backStackEntry ->
                 val artistId = backStackEntry.arguments?.getString("artistId")
                 if (artistId != null) {
-                    ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                    ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                         ArtistDetailScreen(
                             artistId = artistId,
                             navController = navController,
@@ -381,7 +381,7 @@ fun AppNavigation(
             composable(
                 "nav_bar_corner_radius",
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     NavBarCornerRadiusScreen(navController)
                 }
             }
@@ -392,14 +392,14 @@ fun AppNavigation(
                     nullable = true
                 }),
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     EditTransitionScreen(navController = navController)
                 }
             }
             composable(
                 Screen.About.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     AboutScreen(
                         navController = navController,
                         viewModel = playerViewModel,
@@ -410,7 +410,7 @@ fun AppNavigation(
             composable(
                 Screen.EasterEgg.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     EasterEggScreen(
                         viewModel = playerViewModel,
                         onNavigationIconClick = { navController.popBackStack() },
@@ -420,28 +420,28 @@ fun AppNavigation(
             composable(
                 Screen.ArtistSettings.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     ArtistSettingsScreen(navController = navController)
                 }
             }
             composable(
                 Screen.DelimiterConfig.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     DelimiterConfigScreen(navController = navController)
                 }
             }
             composable(
                 Screen.WordDelimiterConfig.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     WordDelimiterConfigScreen(navController = navController)
                 }
             }
             composable(
                 Screen.Equalizer.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     EqualizerScreen(
                         navController = navController,
                         playerViewModel = playerViewModel
@@ -451,7 +451,7 @@ fun AppNavigation(
             composable(
                 Screen.DeviceCapabilities.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     com.theveloper.pixelplay.presentation.screens.DeviceCapabilitiesScreen(
                         navController = navController,
                         playerViewModel = playerViewModel
@@ -461,7 +461,7 @@ fun AppNavigation(
             composable(
                 Screen.NeteaseDashboard.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     com.theveloper.pixelplay.presentation.netease.dashboard.NeteaseDashboardScreen(
                         onBack = { navController.popBackStack() }
                     )
@@ -470,7 +470,7 @@ fun AppNavigation(
             composable(
                 Screen.QqMusicDashboard.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     com.theveloper.pixelplay.presentation.qqmusic.dashboard.QqMusicDashboardScreen(
                         onBack = { navController.popBackStack() }
                     )
@@ -479,7 +479,7 @@ fun AppNavigation(
             composable(
                 Screen.NavidromeDashboard.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     com.theveloper.pixelplay.presentation.navidrome.dashboard.NavidromeDashboardScreen(
                         onBack = { navController.popBackStack() }
                     )
@@ -488,7 +488,7 @@ fun AppNavigation(
             composable(
                 Screen.JellyfinDashboard.route,
             ) {
-                ScreenWrapper(navController = navController, playerViewModel = playerViewModel) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
                     com.theveloper.pixelplay.presentation.jellyfin.dashboard.JellyfinDashboardScreen(
                         onBack = { navController.popBackStack() }
                     )
