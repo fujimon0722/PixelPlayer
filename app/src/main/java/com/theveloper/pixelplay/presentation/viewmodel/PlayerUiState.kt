@@ -22,6 +22,10 @@ data class PlayerUiState(
     // val artists: ImmutableList<Artist> = persistentListOf(), // REMOVED
     val searchResults: ImmutableList<SearchResultItem> = persistentListOf(),
     val musicFolders: ImmutableList<MusicFolder> = persistentListOf(),
+    val showAiPlaylistSheet: Boolean = false,
+    val isGeneratingAiPlaylist: Boolean = false,
+    val aiStatus: String? = null,
+    val aiError: String? = null,
     val sortOption: SortOption = SortOption.SongDefaultOrder,
     val isLoadingInitialSongs: Boolean = true,
     val isLoadingLibrary: Boolean = true,

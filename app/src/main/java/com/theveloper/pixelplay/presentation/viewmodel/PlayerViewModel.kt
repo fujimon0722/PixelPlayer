@@ -162,6 +162,13 @@ private fun moveQueueIndex(index: Int, fromIndex: Int, toIndex: Int): Int {
     }
 }
 
+private data class AiUiSnapshot(
+    val showAiPlaylistSheet: Boolean,
+    val isGeneratingAiPlaylist: Boolean,
+    val aiStatus: String?,
+    val aiError: String?,
+)
+
 private data class SortOptionsSnapshot(
     val songSort: SortOption,
     val albumSort: SortOption,
@@ -1765,6 +1772,32 @@ class PlayerViewModel @Inject constructor(
             playSongsCallback = { songs, startSong, queueName -> playSongs(songs, startSong, queueName) },
             openPlayerSheetCallback = { _isSheetVisible.value = true }
         )
+
+        // Collect AiStateHolder flows for playlist generation state
+        viewModelScope.launch {
+            combine(
+                aiStateHolder.showAiPlaylistSheet,
+                aiStateHolder.isGeneratingAiPlaylist,
+                aiStateHolder.aiStatus,
+                aiStateHolder.aiError,
+            ) { show, generating, status, error ->
+                AiUiSnapshot(
+                    showAiPlaylistSheet = show,
+                    isGeneratingAiPlaylist = generating,
+                    aiStatus = status,
+                    aiError = error
+                )
+            }.collect { snapshot ->
+                _playerUiState.update {
+                    it.copy(
+                        showAiPlaylistSheet = snapshot.showAiPlaylistSheet,
+                        isGeneratingAiPlaylist = snapshot.isGeneratingAiPlaylist,
+                        aiStatus = snapshot.aiStatus,
+                        aiError = snapshot.aiError
+                    )
+                }
+            }
+        }
 
         // Initialize LibraryStateHolder
         libraryStateHolder.initialize(viewModelScope)
