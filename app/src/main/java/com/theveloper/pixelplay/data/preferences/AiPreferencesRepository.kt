@@ -116,6 +116,10 @@ class AiPreferencesRepository @Inject constructor(
     val openrouterModel: Flow<String> = getModel(AiProvider.OPENROUTER)
     val openrouterSystemPrompt: Flow<String> = getSystemPrompt(AiProvider.OPENROUTER)
 
+    val ollamaApiKey: Flow<String> = getApiKey(AiProvider.OLLAMA)
+    val ollamaModel: Flow<String> = getModel(AiProvider.OLLAMA)
+    val ollamaSystemPrompt: Flow<String> = getSystemPrompt(AiProvider.OLLAMA)
+
     val customApiKey: Flow<String> = getApiKey(AiProvider.CUSTOM)
     val customModel: Flow<String> = getModel(AiProvider.CUSTOM)
     val customSystemPrompt: Flow<String> = getSystemPrompt(AiProvider.CUSTOM)
