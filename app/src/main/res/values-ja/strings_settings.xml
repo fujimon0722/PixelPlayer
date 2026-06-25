@@ -625,7 +625,7 @@
     <string name="about_version_format">バージョン v%1$s</string>
     <string name="about_signal_open_source">オープンソース</string>
     <string name="about_signal_community_first">コミュニティファースト</string>
-    <string name="about_signal_material3">Material 3 エクスプレッシブ</string>
+    <string name="about_signal_material3">Material 3 Expressive</string>
     <string name="about_no_contributors">現在コントリビューターが見つかりません。後でもう一度お試しください。</string>
     <string name="about_maintainer_title">メンテナー</string>
     <string name="about_maintainer_subtitle">PixelPlayer の開発者。</string>
